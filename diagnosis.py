@@ -77,3 +77,10 @@ def sort_patient(sort_by : str = Query(..., description='Feature based sorting')
     sorted_data = sorted(data.values(), key=lambda x:x.get(sort_by,0),reverse=sort_order)
     return sorted_data
 
+@app.post('/create')
+def create_record(patient:Patient):
+    data = load_data()
+    if patient.id in data:
+        raise HTTPException(status_code=400, detail='Patient record already exists')
+    data[patient.id] = patient.model_dump(exclude=['id'])
+
