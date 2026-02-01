@@ -12,7 +12,7 @@ class Patient(BaseModel):
     name : Annotated[str, Field(..., description='Enter Patient Name')]
     city : Annotated[str, Field(..., description='Enter Patient City')]
     age : Annotated[int, Field(..., gt=0, lt=120, description='Enter Patient Age')]
-    gender : Annotated[Literal['Male','Female','Others'], Field(..., description='Enter Patient Geneder')]
+    gender : Annotated[Literal['male','female','others'], Field(..., description='Enter Patient Geneder')]
     height : Annotated[float, Field(...,gt=0, description='Enter Patient Height in meters')]
     weight : Annotated[float, Field(...,gt=0, description='Enter Patient Weight in kgs')]
 
@@ -40,9 +40,9 @@ class PatientUpdate(BaseModel):
     name: Annotated[Optional[str], Field(default=None)]
     city: Annotated[Optional[str], Field(default=None)]
     age: Annotated[Optional[int], Field(default=None, gt=0)]
-    gender : Annotated[Optional[Literal['Male','Female','Others']], Field(default=None)]
-    height: Annotated[Optional[int], Field(default=None, gt=0)]
-    weight: Annotated[Optional[int], Field(default=None, gt=0)]
+    gender : Annotated[Optional[Literal['male','female','others']], Field(default=None)]
+    height: Annotated[Optional[float], Field(default=None, gt=0)]
+    weight: Annotated[Optional[float], Field(default=None, gt=0)]
 
 #Json Data Loading
 def load_data():
@@ -123,3 +123,12 @@ def update_patient(patient_id: str, patient_update : PatientUpdate):
 
     for key, value in updated_patient_info.items():
         exist_patient_info[key]=value
+
+    exist_patient_info['id']=patient_id
+    patient_py_obj = Patient(**exist_patient_info)
+    exist_patient_info =  patient_py_obj.model_dump(exclude={'id'})
+
+    #saving the edited data into the json file
+    data[patient_id] = exist_patient_info
+    save_data(data)
+    return JSONResponse(status_code=200, content={'message':'Record Updated!'})
