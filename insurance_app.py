@@ -1,14 +1,18 @@
 from fastapi import FastAPI,Path,HTTPException,Query
 from pydantic import BaseModel, Field, computed_field
 from typing import Annotated, Literal
-import pickle
+import joblib
 import pandas as pd
+from fastapi.responses import JSONResponse
+import numpy as np
 
 #Import ML model
-with open('insurance_model.pkl','rb') as f:
-    model = pickle.load(f)
+model = joblib.load("insurance_model.pkl")
 
 app = FastAPI()
+@app.get("/")
+def home():
+    return {"message": "Insurance Prediction API is running"}
 
 tier_1_cities = {
     "Mumbai", "Delhi", "Bangalore", "Chennai",
@@ -29,15 +33,15 @@ tier_2_cities = {
 }
 
 #pydantic model to validate user data
-class Patient(BaseModel):
+class UserInput(BaseModel):
     age : Annotated[int, Field(..., gt=0, lt=120, description='Enter Age')]
     weight : Annotated[float, Field(...,gt=0, description='Enter Weight in kgs')]
     height : Annotated[float, Field(...,gt=0, description='Enter Height in meters')]
-    inocme_lpa : Annotated[float, Field(...,gt=0, description='Enter your annual salary in lpa')]
+    income_lpa : Annotated[int, Field(...,gt=0, description='Enter your annual salary in lpa')]
     smoker : Annotated[bool, Field(...,description='Are you a smoker?')]
     city : Annotated[str, Field(..., description='Enter your City')]
-    occuapation : Annotated[Literal['retired' 'freelancer' 'student' 'government_job' 'business_owner'
- 'unemployed' 'private_job'], Field(..., description='Enter Patient Geneder')]
+    occupation : Annotated[Literal['retired', 'freelancer', 'student', 'government_job', 'business_owner',
+ 'unemployed', 'private_job'], Field(..., description='Enter Patient Geneder')]
 
     @computed_field
     @property
@@ -48,9 +52,9 @@ class Patient(BaseModel):
     @computed_field
     @property
     def lifestyle_risk(self)->str:
-        if self.smoker == 1 and self.bmi >= 30:
+        if self.smoker and self.bmi >= 30:
             return "high"
-        elif self.smoker == 1 or self.bmi >= 27:
+        elif self.smoker or self.bmi >= 27:
             return "medium"
         else:
             return "low"
@@ -76,3 +80,29 @@ class Patient(BaseModel):
             return 2
         else:
             return 3
+        
+RISK_MAP = {
+    0: "low",
+    1: "medium",
+    2: "high"
+}
+
+@app.post("/predict")
+def predict_premium(data: UserInput):
+    
+    input_df = pd.DataFrame([{
+        'bmi': data.bmi,
+        'age_group': data.age_group,
+        'lifestyle_risk': data.lifestyle_risk,
+        'city_tier': data.city_tier,
+        'income_lpa': data.income_lpa,
+        'occupation': data.occupation
+    }])
+
+    #Prediction
+    pred = model.predict(input_df)[0]
+    if hasattr(pred, "item"):
+        pred = pred.item()
+
+    return JSONResponse(status_code=200, content={"predicted_category": RISK_MAP[pred]})
+
